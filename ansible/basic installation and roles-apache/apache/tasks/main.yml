@@ -1,0 +1,64 @@
+---
+# tasks file for apache
+- name: create ansible group
+  group: name=apache state=present
+  tags:
+    - apache
+- name: create apache user
+  user: name=apache group=apache
+  tags:
+    - apache
+- name: Ensure apache is at the latest version on CentOS or RedHat
+  yum: name=httpd state=present
+  when: ansible_os_family == 'CentOS' or ansible_os_family == 'RedHat'
+  tags:
+    - apache
+- name: Install apache on Debian or Ubuntu
+  apt: name=apache2 update_cache=yes state=latest
+  when: ansible_os_family == 'Debian' or ansible_os_family == 'Ubuntu'
+  tags:
+    - apache
+- name: Start and Enable apache2 on Debian or Ubuntu
+  service:
+    name: apache2
+    state: started
+    enabled: yes
+  when: ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu'
+  tags:
+    - apache
+- name: Start and Enable httpd on CentOS or RedHat
+  service:
+    name: httpd
+    state: started
+    enabled: yes
+  when: ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
+  tags:
+    - apache
+- name: Replace default index.html file
+  template: src=templates/index.html.j2 dest={{ target_dir }}/index.html mode=0755 owner=apache group=apache
+  notify:
+    - Restart httpd
+  tags:
+    - apache
+- name: Ensure httpd is running
+  service: name=httpd state=started
+  tags:
+    - apache
+- name: Apache | get iptables rules
+  shell: iptables -L
+  register: iptablesrules
+  changed_when: false
+  become: yes
+
+- name: Apache | add apache iptable rule
+  command: /sbin/iptables -I INPUT 1 -p tcp --dport http -j ACCEPT -m comment --comment "Apache"
+  become: yes
+  when: iptablesrules.stdout.find("Apache") == -1
+
+- name: save iptables
+  command: iptables-save
+  become: yes
+  when: iptablesrules.stdout.find("Apache") == -1
+  notify:
+    - reload iptables
+

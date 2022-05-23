@@ -1,0 +1,7 @@
+---
+# handlers file for apache
+- name: Restart httpd
+  service: name=httpd state=restarted
+- name: reload iptables
+  become: yes
+  shell: iptables-restore <  /etc/sysconfig/iptables
